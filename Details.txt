@@ -1,0 +1,47 @@
+1. Instalare Istio: (doc): https://istio.io/latest/docs/setup/getting-started/#download
+
+2. Comenzi Instalare:
+
+curl -L https://istio.io/downloadIstio | sh -
+cd istio-1.23.3
+export PATH=$PWD/bin:$PATH
+
+Verificare: istioctl
+
+Pentru instalare Istio in Cluster: `istioctl install`
+    -> Verificare: `kubectl get ns`
+
+3. Utilizare Comanda:
+
+` kubectl label namespace <nume-namespace> istio-injection=enabled ` -> pentru a aplica istio ns-ului in care dorim (envoy proxy-uri)
+
+Raspuns: "namespace/istio-practice-app labeled"
+
+Apoi: `kubectl delete -f mainfest-ms-app-istio.yaml` si reaplicarea configuratiei pentru a observa schimbarile
+
+Dupa ce utilizam `kubectl apply -f mainfest-ms-app-istio.yaml` iarasi vom observa:
+
+"pod/cartservice-77549b5fd5-4pfmb             2/2     Running            0             39s"
+    -> 2/2: ca envoy-proxy-ul a fost adaugat pod-ului
+
+Daca: `kubectl describe pod/cartservice-77549b5fd5-4pfmb -n istio-practice-app`, atunci vom vedea:
+    
+    "Normal   Created    6m6s   kubelet            Created container istio-proxy
+     Normal   Started    6m6s   kubelet            Started container istio-proxy "
+
+4. Pentru vizualizare si monitorizare:
+
+kubectl apply -f /home/ggheorghe/Desktop/projects/istio-1.23.3/samples/addons // aplicare path-ului respectiv al locului unde ai instalat Istio
+
+Vizualizare:
+
+kubectl get pod -n istio-system
+kubectl get svc -n istio-system
+
+Rezultat:
+`kiali                  ClusterIP      10.101.89.89     <none>        20001/TCP,9090/TCP`
+
+Aplicam comanda:
+`kubectl port-forward svc/kiali -n istio-system 20001`
+
+Si accesam: 127.0.0.1:20001 pentru Kiali
