@@ -1,47 +1,53 @@
-1. Instalare Istio: (doc): https://istio.io/latest/docs/setup/getting-started/#download
+Ce este Virtual Service si Destinaton Rules ?
 
-2. Comenzi Instalare:
+Pe scurt:
+ - VirtualService:
+    - Rol: Controlează rutarea traficului către diferitele versiuni (sau subseturi) ale unui serviciu, pe baza unor criterii specifice (de exemplu, anteturi, parametri de query, sau alte condiții de potrivire).
+    - Nivel de vizibilitate: VirtualService operează la nivel de serviciu și definește reguli pentru traficul direcționat către un anumit serviciu din cluster.
+    - Exemplu de utilizare: Rutarea către o versiune specifică (ex: v1, v2) a unui serviciu pe baza unui antet HTTP, sau rutare canary pentru testarea unei versiuni noi cu un procent redus din trafic.
 
-curl -L https://istio.io/downloadIstio | sh -
-cd istio-1.23.3
-export PATH=$PWD/bin:$PATH
+ - DestinationRules (decide cum se comportă conexiunea odată ajunsă la destinație).
+    - Rol: este folosit pentru a crea 'subset-uri' (versiuni, certificate mTLS, etc) 
+    - Nivel de vizibilitate: DestinationRule operează la nivel de destinație și se aplică instanțelor unui serviciu (pod-uri), permițând configurarea de politici avansate.
+    - Exemplu de utilizare: Definirea subseturilor v1, v2 ale unui serviciu și configurarea conexiunilor TLS pentru a asigura securitatea între microservicii.
 
-Verificare: istioctl
+Exemple:
 
-Pentru instalare Istio in Cluster: `istioctl install`
-    -> Verificare: `kubectl get ns`
+1. VirtualService
 
-3. Utilizare Comanda:
+```yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: example-virtualservice
+spec:
+  hosts:
+    - "example.com" # Numele serviciului care contine pod-urile/subset-urile la care vrem sa trimitem traficul primit in acest VirtualService 
+                    # => poate necesita numele intreg de DNS: "<nume-svc>.<nume-ns>.svc.cluster.local"
+  http:
+    - match:
+        - headers:
+            x-request-id:
+              exact: "some-value"
+      route:
+        - destination:
+            host: app-backend-service
+            subset: v1 # Catre ce subset se ruteaza traficul (acesta fiind caracterizat in `DestinationRules` )
+            port:
+              number: 8080
+          weight: 100
+    - route:
+        - destination:
+            host: app-backend-service
+            subset: v2
+            port:
+              number: 8080
+          weight: 100
+```
 
-` kubectl label namespace <nume-namespace> istio-injection=enabled ` -> pentru a aplica istio ns-ului in care dorim (envoy proxy-uri)
+În acest exemplu:
 
-Raspuns: "namespace/istio-practice-app labeled"
+ - Traficul care are un antet x-request-id cu valoarea "some-value" este direcționat către instanțele din subsetul v1 al serviciului app-backend-service.
+ - Restul cererilor sunt procesate în mod normal, dar consistent hashing se va aplica astfel încât aceleași valori ale antetului vor duce la aceleași instanțe de serviciu.
 
-Apoi: `kubectl delete -f mainfest-ms-app-istio.yaml` si reaplicarea configuratiei pentru a observa schimbarile
-
-Dupa ce utilizam `kubectl apply -f mainfest-ms-app-istio.yaml` iarasi vom observa:
-
-"pod/cartservice-77549b5fd5-4pfmb             2/2     Running            0             39s"
-    -> 2/2: ca envoy-proxy-ul a fost adaugat pod-ului
-
-Daca: `kubectl describe pod/cartservice-77549b5fd5-4pfmb -n istio-practice-app`, atunci vom vedea:
-    
-    "Normal   Created    6m6s   kubelet            Created container istio-proxy
-     Normal   Started    6m6s   kubelet            Started container istio-proxy "
-
-4. Pentru vizualizare si monitorizare:
-
-kubectl apply -f /home/ggheorghe/Desktop/projects/istio-1.23.3/samples/addons // aplicare path-ului respectiv al locului unde ai instalat Istio
-
-Vizualizare:
-
-kubectl get pod -n istio-system
-kubectl get svc -n istio-system
-
-Rezultat:
-`kiali                  ClusterIP      10.101.89.89     <none>        20001/TCP,9090/TCP`
-
-Aplicam comanda:
-`kubectl port-forward svc/kiali -n istio-system 20001`
-
-Si accesam: 127.0.0.1:20001 pentru Kiali
+! Important: Unde avem `route.subset: <nume-subset>` -> acolo ne spune catre ce subset se ruteaza traficul (acesta fiind caracterizat in `DestinationRules` )
